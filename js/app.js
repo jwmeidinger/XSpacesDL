@@ -1,8 +1,7 @@
 // js/main.js
 
 // Import necessary utilities
-import b64 from './utils/base64.js';         // Utility for Base64 encoding/decoding
-import fileDict from './utils/fileDict.js';  // Utility for handling file dictionaries
+import runFFmpeg from "/js/runFFmpeg.js"
 
 // State Tracking
 let startTime = null;
@@ -250,122 +249,6 @@ function splitBuffer(buffer, chunkSize = 10 * 1024 * 1024) { // 10MB chunks
 }
 
 /**
- * Sends the buffer to the offscreen document in chunks
- * @param {ArrayBuffer} buffer 
- * @param {string} format 
- * @returns {Promise<ArrayBuffer>}
- */
-async function offscreenRun(buffer, format) {
-    // Create offscreen document if it doesn't exist
-    if (!await chrome.offscreen.hasDocument()) {
-        await chrome.offscreen.createDocument({
-            url: 'html/offscreen.html',
-            reasons: ['WORKERS'],
-            justification: 'Perform FFmpeg operations off the main thread'
-        });
-    }
-
-    const chunks = splitBuffer(buffer);
-    const port = chrome.runtime.connect({ name: 'ffmpeg-port' });
-    
-    return new Promise((resolve, reject) => {
-        const transferId = Date.now().toString();
-        const processedChunks = [];
-        let totalExpectedChunks = 0;
-        
-        port.onMessage.addListener(function messageHandler(response) {
-            try {
-                console.log('Received message:', response.type);
-                
-                switch (response.type) {
-                    case 'chunk-received':
-                        // Send next chunk or signal completion
-                        if (chunks.length > 0) {
-                            const nextChunk = chunks.shift();
-                            port.postMessage({
-                                type: 'chunk-transfer',
-                                transferId: transferId,
-                                chunkIndex: processedChunks.length,
-                                totalChunks: chunks.length + 1,
-                                chunk: nextChunk,
-                                format: format
-                            });
-                        } else {
-                            port.postMessage({
-                                type: 'transfer-complete',
-                                transferId: transferId,
-                                format: format
-                            });
-                        }
-                        break;
-
-                    case 'ffmpeg-convert-success':
-                        // Store converted chunk
-                        processedChunks[response.chunkIndex] = response.buffer;
-                        totalExpectedChunks = response.totalChunks;
-                        
-                        // Check if all chunks are received
-                        if (processedChunks.filter(Boolean).length === totalExpectedChunks) {
-                            // Merge all processed chunks
-                            const totalLength = processedChunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
-                            const mergedBuffer = new Uint8Array(totalLength);
-                            let offset = 0;
-                            
-                            for (const chunk of processedChunks) {
-                                mergedBuffer.set(new Uint8Array(chunk), offset);
-                                offset += chunk.byteLength;
-                            }
-                            
-                            resolve(mergedBuffer.buffer);
-                            port.disconnect();
-                        }
-                        break;
-
-                    case 'ffmpeg-convert-error':
-                        reject(new Error(response.error));
-                        port.disconnect();
-                        break;
-
-                    case 'ffmpeg-progress':
-                        updateProgress(response.data);
-                        break;
-
-                    case 'ffmpeg-log':
-                        console.log('FFmpeg:', response.data);
-                        break;
-                }
-            } catch (error) {
-                console.error('Message handling error:', error);
-                reject(error);
-                port.disconnect();
-            }
-        });
-
-        // Start the transfer with the first chunk
-        if (chunks.length > 0) {
-            const firstChunk = chunks.shift();
-            port.postMessage({
-                type: 'chunk-transfer',
-                transferId: transferId,
-                chunkIndex: 0,
-                totalChunks: chunks.length + 1,
-                chunk: firstChunk,
-                format: format
-            });
-        } else {
-            reject(new Error('No data to process'));
-            port.disconnect();
-        }
-
-        port.onDisconnect.addListener(() => {
-            if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-            }
-        });
-    });
-}
-
-/**
  * Sends the audio blob to the transcription service.
  * @param {Blob} audioBlob 
  * @returns {Promise<Object>} Transcription result
@@ -546,7 +429,7 @@ function getM3U8Url() {
 async function convertToFormat(buffer, format) {
     try {
         updateStatus(`Converting to ${format.toUpperCase()}...`);
-        const convertedBuffer = await offscreenRun(buffer, format);
+        const convertedBuffer = await runFFmpeg(buffer, format);
         const blob = new Blob([convertedBuffer], { 
             type: format === 'mp3' ? 'audio/mp3' : 'video/mp4' 
         });
