@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="worker-src 'self';">
+    <title>Media Converter</title>
+    <link rel="stylesheet" href="../css/options.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>X Spaces Converter</h1>
+            
+            <div class="progress-container" id="progress-container">
+                <!-- Main progress bar -->
+                <div class="progress-wrapper" id="progress-wrapper">
+                    <div class="progress-bar" id="progress-bar">
+                        <div class="progress-bar-value" id="progress-bar-value">0%</div>
+                    </div>
+                </div>
+                
+                <!-- Progress details -->
+                <div class="progress-details">
+                    <div class="detail-row">
+                        <div class="detail-item">
+                            <span class="label">Status</span>
+                            <span class="value" id="status">Ready to process</span>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-row">
+                        <div class="detail-item">
+                            <span class="label">Elapsed</span>
+                            <span class="value" id="elapsed-time">--:--</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">Remaining</span>
+                            <span class="value" id="remaining-time">--:--</span>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-row">
+                        <div class="detail-item">
+                            <span class="label">Speed</span>
+                            <span class="value" id="processing-speed">-- fps</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">Size</span>
+                            <span class="value" id="file-size">-- MB</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error display -->
+                <div class="error" id="error"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../lib/ffmpeg.min.js"></script>
+    <script src="../lib/ffmpeg-core.js"></script>
+    <script type="module" src="../js/app.js"></script>
+</body>
+</html>
